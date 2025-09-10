@@ -1,8 +1,11 @@
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-# --- Dice Loss ---
+# ---------------------------
+# Dice Loss
+# ---------------------------
 class DiceLoss(nn.Module):
     def __init__(self, smooth=1e-6):
         super().__init__()
@@ -10,13 +13,14 @@ class DiceLoss(nn.Module):
 
     def forward(self, inputs, targets):
         # inputs: (B,C,H,W), logits
-        # targets: (B,H,W), biasanya float → convert ke long
-        targets = targets.long()
-
-        inputs = F.softmax(inputs, dim=1)
+        targets = targets.clone().long()   # ✅ clone supaya aman
         num_classes = inputs.shape[1]
 
-        # one-hot target
+        # clamp target supaya aman
+        targets[targets >= num_classes] = 0
+        targets[targets < 0] = 0
+
+        inputs = F.softmax(inputs, dim=1)
         targets_onehot = F.one_hot(targets, num_classes).permute(0,3,1,2).float()
 
         intersection = (inputs * targets_onehot).sum(dim=(2,3))
@@ -27,11 +31,12 @@ class DiceLoss(nn.Module):
         return loss
 
 
-# --- Boundary-Aware Loss (pakai Laplacian edge detection) ---
+# ---------------------------
+# Boundary-Aware Loss
+# ---------------------------
 class BoundaryAwareLoss(nn.Module):
     def __init__(self):
         super().__init__()
-        # Laplacian kernel 3x3
         laplace_kernel = torch.tensor([[[[0,-1,0],
                                          [-1,4,-1],
                                          [0,-1,0]]]], dtype=torch.float32)
@@ -39,25 +44,33 @@ class BoundaryAwareLoss(nn.Module):
         self.laplace.weight = nn.Parameter(laplace_kernel, requires_grad=False)
 
     def forward(self, inputs, targets):
-        # inputs: (B,C,H,W), logits
-        # targets: (B,H,W), long
+        num_classes = inputs.shape[1]
+        targets = targets.clone().long()   # ✅ clone supaya aman
+        targets[targets >= num_classes] = 0
+        targets[targets < 0] = 0
+
         inputs = F.softmax(inputs, dim=1)
         preds = torch.argmax(inputs, dim=1, keepdim=True).float()
         targets = targets.unsqueeze(1).float()
 
-        # boundary maps
+        # 🔥 pastikan kernel ikut device & dtype
+        self.laplace = self.laplace.to(device=preds.device, dtype=preds.dtype)
+
         pred_boundary = torch.sigmoid(self.laplace(preds))
         target_boundary = torch.sigmoid(self.laplace(targets))
 
         return F.l1_loss(pred_boundary, target_boundary)
 
 
-# --- Combined Loss ---
+# ---------------------------
+# Combined Segmentation Loss
+# ---------------------------
 class SegmentationLoss(nn.Module):
     def __init__(self, num_classes=20,
                  dice_weight=0.4, ce_weight=0.3, boundary_weight=0.3,
                  use_boundary_loss=True):
         super().__init__()
+        self.num_classes = num_classes
         self.dice_loss = DiceLoss()
         self.ce_loss = nn.CrossEntropyLoss()
         self.boundary_loss = BoundaryAwareLoss() if use_boundary_loss else None
@@ -67,6 +80,10 @@ class SegmentationLoss(nn.Module):
         self.use_boundary_loss = use_boundary_loss
 
     def forward(self, inputs, targets):
+        targets = targets.clone().long()   # ✅ clone supaya aman
+        targets[targets >= self.num_classes] = 0
+        targets[targets < 0] = 0
+
         dice = self.dice_loss(inputs, targets)
         ce = self.ce_loss(inputs, targets)
         loss = self.dice_w * dice + self.ce_w * ce
@@ -77,3 +94,4 @@ class SegmentationLoss(nn.Module):
             return loss, {"dice": dice.item(), "ce": ce.item(), "boundary": boundary.item()}
         else:
             return loss, {"dice": dice.item(), "ce": ce.item()}
+
