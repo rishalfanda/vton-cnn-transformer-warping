@@ -1,3 +1,4 @@
+# unet.py
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -16,6 +17,7 @@ class DoubleConv(nn.Module):
     def forward(self, x):
         return self.conv(x)
 
+
 class Down(nn.Module):
     def __init__(self, in_ch, out_ch):
         super().__init__()
@@ -25,6 +27,7 @@ class Down(nn.Module):
         )
     def forward(self, x):
         return self.net(x)
+
 
 class Up(nn.Module):
     def __init__(self, in_ch, out_ch):
@@ -40,6 +43,7 @@ class Up(nn.Module):
         x = torch.cat([x2, x1], dim=1)
         return self.conv(x)
 
+
 class OutConv(nn.Module):
     def __init__(self, in_ch, out_ch):
         super().__init__()
@@ -47,8 +51,9 @@ class OutConv(nn.Module):
     def forward(self, x):
         return self.conv(x)
 
+
 class UNet(nn.Module):
-    def __init__(self, in_channels=3, num_classes=20):
+    def __init__(self, in_channels=22, num_classes=20):
         super().__init__()
         self.inc = DoubleConv(in_channels, 64)
         self.down1 = Down(64, 128)
@@ -75,8 +80,15 @@ class UNet(nn.Module):
         x = self.up4(x, x1)
         return self.outc(x)
 
+
+# --- Quick test ---
 if __name__ == "__main__":
-    model = UNet(in_channels=3, num_classes=20)
-    x = torch.randn(2, 3, 512, 384)
+    from configs.vton_config_default import config
+    in_ch = 22
+    num_classes = config["segmentation"]["num_classes"]
+    H, W = config["preprocessing"]["image_size"]
+
+    model = UNet(in_channels=in_ch, num_classes=num_classes)
+    x = torch.randn(2, in_ch, H, W)
     y = model(x)
-    print("Output:", y.shape)  # expect (2,20,512,384)
+    print("Output:", y.shape)  # (2, num_classes, H, W)
