@@ -53,23 +53,27 @@ config = {
     },
 
     # ---------- Segmentation model ----------
-    "segmentation": {
-        "in_channels": 26,  # 3 (person) + 18 (pose) + 1 (parse) + 3 (cloth) + 1 (mask)
-        "num_classes": 20,
-        "model_type": "transunet",
-        "encoder_channels": [64, 128, 256, 512],
-        "decoder_channels": [256, 128, 64, 32],
-        "hidden_size": 768,
-        "num_layers": 8,
-        "num_heads": 8,
-        "mlp_dim": 2048,
-        "dropout": 0.1,
-        "patch_size": 16,
-        "dice_weight": 0.4,
-        "ce_weight": 0.3,
-        "boundary_weight": 0.3,
-        "use_boundary_loss": True
-    },
+   "segmentation": {
+    "in_channels": 22,  # 3 (person) + 18 (pose) + 1 (parse)
+    "num_classes": 20,
+    "model_type": "transunet",
+    "encoder_channels": [64, 128, 256, 512],
+    "decoder_channels": [256, 128, 64, 32],
+    "hidden_size": 768,
+    "num_layers": 8,
+    "num_heads": 8,
+    "mlp_dim": 2048,
+    "dropout": 0.1,
+    "patch_size": 16,
+    "dice_weight": 0.4,
+    "ce_weight": 0.3,
+    "boundary_weight": 0.3,
+    "use_boundary_loss": True,
+
+    # 🔥 Tambahan untuk input builder
+    "use_cloth": False,
+    "use_cloth_mask": False
+  },
 
     # ---------- Warping ----------
     "warping": {
@@ -81,7 +85,7 @@ config = {
 
     # ---------- Training ----------
     "training": {
-        "epochs": 50,
+        "epochs": 20,
         "batch_size": 1,     # ⚡ kecil biar stabil
         "learning_rate": 1e-4,
         "weight_decay": 1e-5,
