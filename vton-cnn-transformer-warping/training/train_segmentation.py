@@ -24,8 +24,10 @@ def train_one_epoch(model, train_loader, optimizer, criterion, device, scaler):
     total_loss = 0.0
 
     pbar = tqdm(train_loader, desc="Training", leave=False)
+    use_cloth= config["segmentation"].get("use_cloth", False)
+    use_cloth_mask = config["segmentation"].get("use_cloth_mask", False)
     for batch in pbar:
-        inputs = build_input(batch, use_cloth=False, use_cloth_mask=False).to(device)
+        inputs = build_input(batch, use_cloth=use_cloth, use_cloth_mask=use_cloth_mask).to(device)
         targets = batch["parse"].to(device)
 
         optimizer.zero_grad()
@@ -53,9 +55,11 @@ def train_one_epoch(model, train_loader, optimizer, criterion, device, scaler):
 def validate(model, val_loader, criterion, device):
     model.eval()
     total_loss = 0.0
+    use_cloth= config["segmentation"].get("use_cloth", False)
+    use_cloth_mask = config["segmentation"].get("use_cloth_mask", False)
     with torch.no_grad():
         for batch in val_loader:
-            inputs = build_input(batch, use_cloth=True, use_cloth_mask=True).to(device)
+            inputs = build_input(batch, use_cloth=use_cloth, use_cloth_mask=use_cloth_mask).to(device)
             targets = batch["parse"].to(device)
 
             with autocast("cuda"):
@@ -75,10 +79,13 @@ def main():
 
     # --- Model ---
     model_type = config["segmentation"]["model_type"]
+    in_ch = config["segmentation"]["in_channels"]
+    num_classes = config["segmentation"]["num_classes"]
+
     if model_type == "unet":
-        model = UNet(in_channels=22, num_classes=20).to(device)
+        model = UNet(in_channels=in_ch, num_classes=num_classes).to(device)
     else:
-        model = TransUNetLight(in_channels=22, num_classes=20).to(device)
+        model = TransUNetLight(in_channels=in_ch, num_classes=num_classes).to(device)
 
     # --- Loss ---
     criterion = SegmentationLoss(
